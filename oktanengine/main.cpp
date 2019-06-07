@@ -3,6 +3,46 @@
 
 #include <iostream>
 
+static unsigned int CompileShader(unsigned int type, const std::string& source)
+{
+	unsigned int id = glCreateShader(type);
+	const char* src = source.c_str();
+	glShaderSource(id, 1, &src, nullptr);
+	glCompileShader(id);
+
+	int res = 0;
+	glGetShaderiv(id, GL_COMPILE_STATUS, &res);
+	if (res == GL_FALSE)
+	{
+		int len = 0;
+		glGetShaderiv(id, GL_INFO_LOG_LENGTH, &len);
+		char* buf = new char[len];
+		glGetShaderInfoLog(id, len, &len, buf);
+		std::cout << type << " failed!: ";
+		std::cout << buf << std::endl;
+		delete[] buf;
+		glDeleteShader(id);
+	}
+	return id;
+}
+
+static unsigned int CreateShader(const std::string& vertexShader, const std::string& fragmentShader)
+{
+	unsigned int program = glCreateProgram();
+	unsigned int vs = CompileShader(GL_VERTEX_SHADER, vertexShader);
+	unsigned int fs = CompileShader(GL_FRAGMENT_SHADER, fragmentShader);
+
+	glAttachShader(program, vs);
+	glAttachShader(program, fs);
+	glLinkProgram(program);
+	glValidateProgram(program);
+
+	glDeleteShader(vs);
+	glDeleteShader(fs); 
+
+	return program;
+}
+
 int main(void)
 {
 	GLFWwindow* window;
@@ -40,12 +80,34 @@ int main(void)
 	// GL_ARRAY_BUFFER for vertex attributes
 	// Binding is like selecting the buffer for opengl state machine
 	glBindBuffer(GL_ARRAY_BUFFER, bufId);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
 	// Create and initialize buffer's data store
 	// GL_ARRAY_BUFFER for vertex attributes
 	// size is in bytes
 	glBufferData(GL_ARRAY_BUFFER, sizeof(positions), positions, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
+
+	std::string vtxShader =
+		"#version 330 core\n"
+		"\n"
+		"layout(location = 0) in vec4 position;\n"
+		"\n"
+		"void main()\n"
+		"{\n"
+		"gl_Position = position;\n"
+		"}\n";
+	std::string fragShader =
+		"#version 330 core\n"
+		"\n"
+		"layout(location = 0) out vec4 color;\n"
+		"\n"
+		"void main()\n"
+		"{\n"
+		"color = vec4(1.0, 0.0, 0.0, 1.0);\n"
+		"}\n";
+	unsigned int shader = CreateShader(vtxShader, fragShader);
+	glUseProgram(shader);
 
 	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
