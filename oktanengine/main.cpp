@@ -2,6 +2,51 @@
 #include <GLFW/glfw3.h>
 
 #include <iostream>
+#include <string>
+#include <sstream>
+#include <fstream>
+
+struct ShaderProgramSource
+{
+	std::string VertexSource;
+	std::string FragmentSource;
+};
+
+static ShaderProgramSource ParseShader(const std::string& filePath)
+{
+	enum class ShaderType
+	{
+		None = -1,
+		Vertex = 0,
+		Fragment = 1,
+	};
+	std::ifstream ifs(filePath);
+	std::string line;
+	std::stringstream ss[2];
+	ShaderType type = ShaderType::None;
+	while (std::getline(ifs, line))
+	{
+		if (line.find("#shader") != std::string::npos)
+		{
+			if (line.find("vertex") != std::string::npos)
+			{
+				type = ShaderType::Vertex;
+			}
+			else if (line.find("fragment") != std::string::npos)
+			{
+				type = ShaderType::Fragment;
+			}
+		}
+		else
+		{
+			if (type != ShaderType::None)
+			{
+				ss[static_cast<int>(type)] << line << "\n";
+			}
+		}
+	}
+	return { ss[0].str(), ss[1].str() };
+}
 
 static unsigned int CompileShader(unsigned int type, const std::string& source)
 {
@@ -67,12 +112,17 @@ int main(void)
 
 	std::cout << glGetString(GL_VERSION) << std::endl;
 
-	float positions[6] = {
-		-0.5f, -0.5f,
-		 0.0f,  0.5f,
-		 0.5f, -0.5f
+	float positions[12] = {
+		-0.5, -0.5,
+		-0.5,  0.5,
+		 0.5, -0.5,
+		 0.5, -0.5,
+		 0.5,  0.5,
+		-0.5,  0.5,
 	};
 	
+	auto var = ParseShader("res/shaders/Basic.shader");
+
 	GLuint bufId;
 	// Generate a buffer and give us its ID
 	glGenBuffers(1, &bufId);
@@ -87,27 +137,8 @@ int main(void)
 
 	glEnableVertexAttribArray(0);
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), 0);
-
-	std::string vtxShader =
-		"#version 330 core\n"
-		"\n"
-		"layout(location = 0) in vec4 position;\n"
-		"\n"
-		"void main()\n"
-		"{\n"
-		"gl_Position = position;\n"
-		"}\n";
-	std::string fragShader =
-		"#version 330 core\n"
-		"\n"
-		"layout(location = 0) out vec4 color;\n"
-		"\n"
-		"void main()\n"
-		"{\n"
-		"color = vec4(1.0, 0.0, 0.0, 1.0);\n"
-		"}\n";
-	unsigned int shader = CreateShader(vtxShader, fragShader);
-	glUseProgram(shader);
+	unsigned int program = CreateShader(var.VertexSource, var.FragmentSource);
+	glUseProgram(program);
 
 	/* Loop until the user closes the window */
 	while (!glfwWindowShouldClose(window))
@@ -115,15 +146,17 @@ int main(void)
 		/* Render here */
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glDrawArrays(GL_TRIANGLES, 0, sizeof(positions) / (sizeof(positions[0]) * 2));
 
 		/* Swap front and back buffers */
 		glfwSwapBuffers(window);
-
+		
+		//glfwWaitEventsTimeout(10);
 		/* Poll for and process events */
 		glfwPollEvents();
 	}
 
+	glDeleteProgram(program);
 	glfwTerminate();
 	return 0;
 }
